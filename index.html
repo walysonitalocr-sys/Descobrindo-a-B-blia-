@@ -1,0 +1,675 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Descobrindo a Bíblia — jogo infantil</title>
+<style>
+  :root{
+    --bg:#a8e6ff; --card:#ffffffcc; --accent:#ffb703; --ok:#16a34a; --err:#ef4444;
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0; font-family:Inter,system-ui,Segoe UI,Roboto, "Helvetica Neue", Arial;
+    background:linear-gradient(180deg,var(--bg),#cfeeff); color:#10324a;
+    display:flex;justify-content:center;padding:20px 10px 90px 10px; min-height:100vh;
+  }
+  .wrap{width:100%;max-width:900px}
+  .app{background:var(--card);border-radius:18px;padding:18px;box-shadow:0 8px 30px rgba(2,18,28,0.12)}
+  header{display:flex;align-items:center;gap:12px}
+  h1{font-size:1.5rem;margin:0}
+  .controls{margin-top:10px;display:flex;gap:8px;flex-wrap:wrap}
+  button{background:#fff;border:0;padding:10px 14px;border-radius:10px;font-weight:700;cursor:pointer}
+  .status{margin-top:12px;display:flex;justify-content:space-between;align-items:center;gap:10px}
+  .hearts{font-size:1.4rem}
+  .progress{flex:1;height:12px;background:#ffffff80;border-radius:999px;margin:0 10px;overflow:hidden}
+  .progress > .bar{height:100%;width:0%;background:var(--accent);transition:width .35s}
+  main{margin-top:14px;min-height:360px;display:flex;justify-content:center;align-items:center}
+  .stage{width:100%}
+  .center{display:flex;flex-direction:column;align-items:center;gap:12px}
+  .big-btn{font-size:1.05rem;padding:14px 18px;border-radius:12px;background:#fff}
+  /* board areas */
+  .scene{width:100%;display:flex;gap:16px;flex-wrap:wrap;justify-content:center;align-items:flex-start}
+  .left, .right{flex:1;min-width:260px}
+  .card{background:#fff;border-radius:12px;padding:12px;box-shadow:0 6px 18px rgba(2,18,28,0.06);text-align:center}
+  .svg-small{width:120px;height:100px;margin:8px auto;touch-action:none}
+  .opts-grid{display:flex;flex-wrap:wrap;gap:10px;justify-content:center}
+  .choice{width:140px;height:140px;border-radius:12px;display:flex;align-items:center;justify-content:center;cursor:pointer;border:4px solid transparent}
+  .choice.correct{border-color:var(--ok);box-shadow:0 6px 20px rgba(22,163,74,0.12)}
+  .choice.wrong{border-color:var(--err);box-shadow:0 6px 20px rgba(239,68,68,0.12)}
+  /* drag area */
+  .ark-area{height:320px;border-radius:12px;background:linear-gradient(180deg,#fef7e6,#fff);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:8px;position:relative}
+  .ark{width:240px;height:140px}
+  .animal-pile{display:flex;flex-wrap:wrap;gap:10px;justify-content:center;padding:8px}
+  .animal{width:90px;height:90px;border-radius:10px;background:#fff;display:flex;align-items:center;justify-content:center;box-shadow:0 8px 20px rgba(0,0,0,0.06);cursor:grab;touch-action:none}
+  .animal.dragging{opacity:.6;transform:scale(.98)}
+  .drop-here{position:absolute;bottom:12px;left:50%;transform:translateX(-50%);padding:6px 12px;border-radius:999px;background:#fff8;backdrop-filter:blur(4px)}
+  /* connect lines area */
+  .connect-board{display:flex;flex-direction:column;gap:8px;align-items:center}
+  .connect-row{display:flex;gap:40px;align-items:center}
+  .connect-item{width:110px;height:110px;border-radius:10px;background:#fff;display:flex;align-items:center;justify-content:center}
+  .connector-line{height:4px;background:#ccc;border-radius:4px}
+  /* footer fixed already requested */
+  footer{position:fixed;bottom:0;left:0;right:0;padding:10px 0;background:rgba(0,0,0,0.12);text-align:center;color:#024; font-weight:600}
+  /* responsive */
+  @media (max-width:640px){
+    .choice{width:110px;height:110px}
+    .animal{width:72px;height:72px}
+    .svg-small{width:90px;height:80px}
+  }
+  /* confetti */
+  .confetti{position:fixed;z-index:9999;pointer-events:none;width:10px;height:10px;border-radius:2px;opacity:0.95}
+  /* narration controls */
+  .narration{font-size:.95rem;background:#ffffff88;padding:8px;border-radius:8px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="app" role="application" aria-label="Descobrindo a Bíblia">
+    <header>
+      <img src="" alt="" id="logo" style="width:56px;height:56px;border-radius:10px;background:linear-gradient(180deg,#ffd89b,#ffb703);display:block" />
+      <div>
+        <h1>Descobrindo a Bíblia</h1>
+        <div style="font-size:.92rem;color:#045">Jogo educativo para 3-6 anos</div>
+      </div>
+    </header>
+
+    <div class="controls">
+      <button id="startBtn" class="big-btn">▶ Iniciar</button>
+      <button id="soundBtn">🔊 Som: On</button>
+      <button id="helpBtn">❓ Como jogar</button>
+      <div style="flex:1"></div>
+      <div class="narration" id="narrText" style="display:none">Narração</div>
+    </div>
+
+    <div class="status" aria-hidden>
+      <div class="hearts" id="hearts">❤️❤️❤️</div>
+      <div class="progress" title="Progresso">
+        <div class="bar" id="progressBar"></div>
+      </div>
+      <div id="levelLabel" style="min-width:160px;text-align:right;font-weight:700">Fase 1 • Arca de Noé</div>
+    </div>
+
+    <main>
+      <section class="stage" id="stageArea">
+        <!-- dynamic content -->
+        <div class="center">
+          <div style="max-width:560px;text-align:center">
+            <p style="font-size:1.05rem">Toque em <strong>Iniciar</strong> para começar. O jogo vai guiar a criança com voz e indicadores visuais.</p>
+            <p style="font-size:.95rem;color:#036">Atividades: arrastar animais, escolher figuras, ligar sequências e tocar crianças.</p>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap">
+      <button id="prevBtn">⟵ Voltar</button>
+      <button id="nextBtn">Avançar ⟶</button>
+    </div>
+  </div>
+</div>
+
+<footer>&copy; 2025 Ítalo Rocha</footer>
+
+<script>
+/* =========== ASSETS SVG (desenhos simples em SVG - estilo cartoon) =========== */
+
+/* helper to create SVG element from string */
+function svg(str){ const d=document.createElement('div'); d.innerHTML=str.trim(); return d.firstChild; }
+
+/* cute animal svgs (small, colorful) */
+function svg_giraffe(){ return `
+  <svg class="svg-small" viewBox="0 0 120 100" xmlns="http://www.w3.org/2000/svg">
+    <rect width="120" height="100" rx="12" fill="#fff0"/>
+    <g transform="translate(10,6)">
+      <rect x="20" y="30" width="18" height="40" rx="6" fill="#ffd05a"/>
+      <circle cx="28" cy="24" r="9" fill="#ffd05a"/>
+      <rect x="36" y="46" width="8" height="28" fill="#ffd05a" rx="4"/>
+      <circle cx="24" cy="20" r="2" fill="#6b3a00"/>
+      <circle cx="32" cy="20" r="2" fill="#6b3a00"/>
+      <rect x="20" y="10" width="6" height="8" rx="3" fill="#6b3a00"/>
+      <rect x="34" y="10" width="6" height="8" rx="3" fill="#6b3a00"/>
+      <rect x="6" y="70" width="100" height="22" rx="10" fill="#f1f1f1" opacity="0.3"/>
+    </g>
+  </svg>`;}
+
+/* elephant */
+function svg_elephant(){ return `
+  <svg class="svg-small" viewBox="0 0 120 100" xmlns="http://www.w3.org/2000/svg">
+    <rect width="120" height="100" rx="12" fill="#fff0"/>
+    <g transform="translate(12,12)">
+      <ellipse cx="44" cy="46" rx="34" ry="24" fill="#9bb0d3"/>
+      <circle cx="18" cy="52" r="8" fill="#9bb0d3"/>
+      <rect x="52" y="36" width="12" height="14" rx="6" fill="#9bb0d3"/>
+      <circle cx="36" cy="36" r="4" fill="#2b3a4a"/>
+      <rect x="2" y="60" width="90" height="18" rx="8" fill="#fff" opacity=".25"/>
+      <rect x="10" y="30" width="12" height="24" rx="6" fill="#9bb0d3"/>
+    </g>
+  </svg>`;}
+
+/* lion */
+function svg_lion(){ return `
+  <svg class="svg-small" viewBox="0 0 120 100" xmlns="http://www.w3.org/2000/svg">
+    <rect width="120" height="100" rx="12" fill="#fff0"/>
+    <g transform="translate(12,8)">
+      <circle cx="44" cy="42" r="22" fill="#ffcc80"/>
+      <circle cx="44" cy="42" r="36" fill="#ff9f1c" opacity="0.95"/>
+      <circle cx="36" cy="36" r="3" fill="#2b2b2b"/>
+      <circle cx="52" cy="36" r="3" fill="#2b2b2b"/>
+      <rect x="34" y="48" width="20" height="6" rx="3" fill="#d97b1a"/>
+    </g>
+  </svg>`;}
+
+/* zebra */
+function svg_zebra(){ return `
+  <svg class="svg-small" viewBox="0 0 120 100" xmlns="http://www.w3.org/2000/svg">
+    <rect width="120" height="100" rx="12" fill="#fff0"/>
+    <g transform="translate(8,10)">
+      <rect x="10" y="20" width="56" height="36" rx="10" fill="#fff"/>
+      <path d="M10 28 q20 0 30 6 t26 -2" stroke="#000" stroke-width="4" fill="none"/>
+      <circle cx="24" cy="30" r="3" fill="#000"/>
+      <circle cx="44" cy="30" r="3" fill="#000"/>
+      <rect x="6" y="56" width="80" height="18" rx="8" fill="#fff" opacity=".25"/>
+    </g>
+  </svg>`;}
+
+/* ark svg */
+function svg_ark(){ return `
+  <svg class="ark" viewBox="0 0 240 140" xmlns="http://www.w3.org/2000/svg">
+    <g>
+      <rect x="10" y="38" width="220" height="70" rx="20" fill="#7c4b1e" />
+      <rect x="34" y="18" width="172" height="48" rx="12" fill="#f6c27a" />
+      <circle cx="60" cy="55" r="6" fill="#fff" />
+      <circle cx="80" cy="55" r="6" fill="#fff" />
+      <circle cx="100" cy="55" r="6" fill="#fff" />
+      <path d="M0 110 q60 30 120 30 t120 -30" fill="#5a3516" />
+    </g>
+  </svg>`;}
+
+/* jonah, boat, fish, map icons */
+function svg_jonah(){ return `
+  <svg class="svg-small" viewBox="0 0 120 100"><rect width="120" height="100" rx="12" fill="#fff0"/><g transform="translate(10,8)">
+  <circle cx="40" cy="28" r="14" fill="#ffd7b5"/><rect x="26" y="44" width="28" height="30" rx="8" fill="#8fbcd4"/><circle cx="36" cy="24" r="2" fill="#222"/><circle cx="44" cy="24" r="2" fill="#222"/></g></svg>`;}
+function svg_boat(){ return `<svg class="svg-small" viewBox="0 0 120 100"><rect width="120" height="100" rx="12" fill="#fff0"/><g transform="translate(6,12)"><path d="M10 58 q40 26 94 0" fill="#8b5e3c"/><rect x="24" y="30" width="46" height="20" rx="6" fill="#f6c27a"/><rect x="46" y="8" width="8" height="22" fill="#6b3a00"/></g></svg>`;}
+function svg_fish(){ return `<svg class="svg-small" viewBox="0 0 120 100"><rect width="120" height="100" rx="12" fill="#fff0"/><g transform="translate(12,30)"><ellipse cx="44" cy="12" rx="36" ry="12" fill="#66c2ff"/><polygon points="76,12 92,4 92,20" fill="#66c2ff"/></g></svg>`;}
+function svg_map(){ return `<svg class="svg-small" viewBox="0 0 120 100"><rect width="120" height="100" rx="12" fill="#fff0"/><g transform="translate(6,6)"><rect width="108" height="88" rx="8" fill="#fff"/><path d="M10 20 q40 -10 80 6" stroke="#66c2ff" stroke-width="4" fill="none"/><circle cx="86" cy="50" r="6" fill="#ff7b7b"/></g></svg>`;}
+
+/* davi and giant */
+function svg_davi(){ return `<svg class="svg-small" viewBox="0 0 120 100"><rect width="120" height="100" rx="12" fill="#fff0"/><g transform="translate(14,6)"><circle cx="30" cy="24" r="12" fill="#ffd7b5"/><rect x="18" y="40" width="24" height="30" rx="8" fill="#7fc1a7"/><path d="M48 56 q10 -6 18 -12" stroke="#6b3a00" stroke-width="4" fill="none"/></g></svg>`;}
+function svg_goliath(){ return `<svg class="svg-small" viewBox="0 0 120 100"><rect width="120" height="100" rx="12" fill="#fff0"/><g transform="translate(8,6)"><circle cx="56" cy="28" r="18" fill="#f6c27a"/><rect x="38" y="48" width="36" height="30" rx="8" fill="#b46b6b"/><path d="M76 62 q10 -12 18 -18" stroke="#6b3a00" stroke-width="4" fill="none"/></g></svg>`;}
+
+/* jesus and children */
+function svg_jesus(){ return `<svg class="svg-small" viewBox="0 0 120 100"><rect width="120" height="100" rx="12" fill="#fff0"/><g transform="translate(12,6)"><circle cx="40" cy="24" r="12" fill="#ffd7b5"/><rect x="28" y="40" width="24" height="34" rx="10" fill="#f9d7d1"/><path d="M18 74 q22 12 44 0" stroke="#6b3a00" stroke-width="3" fill="none"/></g></svg>`;}
+function svg_child(col){ return `<svg class="svg-small" viewBox="0 0 120 100"><rect width="120" height="100" rx="12" fill="#fff0"/><g transform="translate(12,6)"><circle cx="44" cy="26" r="12" fill="${col}"/><rect x="32" y="44" width="24" height="28" rx="6" fill="#fff7"/></g></svg>`;}
+
+/* =========== SONS SIMPLES via WebAudio =========== */
+let audioCtx = null;
+function ensureAudio(){
+  if(!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+}
+function tone(freq, time=0.15, type='sine'){
+  ensureAudio();
+  const o = audioCtx.createOscillator();
+  const g = audioCtx.createGain();
+  o.type = type; o.frequency.value = freq;
+  o.connect(g); g.connect(audioCtx.destination);
+  g.gain.value = 0.0001;
+  o.start();
+  g.gain.exponentialRampToValueAtTime(0.12, audioCtx.currentTime+0.01);
+  g.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime+time);
+  o.stop(audioCtx.currentTime+time+0.02);
+}
+
+/* música de fundo suave (loop simples) */
+let musicOn = true, musicNode=null;
+function startMusic(){
+  if(!musicOn) return;
+  ensureAudio();
+  if(musicNode) return;
+  const o1 = audioCtx.createOscillator();
+  const g1 = audioCtx.createGain();
+  o1.type='sine'; o1.frequency.value=220;
+  o1.connect(g1); g1.connect(audioCtx.destination);
+  g1.gain.value = 0.02;
+  o1.start();
+  musicNode = {osc:o1,gain:g1};
+}
+function stopMusic(){
+  if(!musicNode) return;
+  musicNode.osc.stop(); musicNode.gain.disconnect(); musicNode=null;
+}
+
+/* =========== NARRAÇÃO com SpeechSynthesis =========== */
+let synth = window.speechSynthesis;
+function speak(text, opts={}){
+  if(!synth) return;
+  // try to pick a male voice
+  let utter = new SpeechSynthesisUtterance(text);
+  const voices = synth.getVoices();
+  let male = voices.find(v=>/male|masculino|Paul|Pedro|Alex|Daniel/i.test(v.name)) || voices.find(v=>/en-GB|pt-BR|pt/i.test(v.lang));
+  if(male) utter.voice = male;
+  utter.lang = 'pt-BR';
+  utter.rate = opts.rate || 0.9;
+  utter.pitch = opts.pitch || 1;
+  synth.cancel();
+  synth.speak(utter);
+  document.getElementById('narrText').style.display = 'block';
+  document.getElementById('narrText').textContent = text;
+  utter.onend = ()=>{ setTimeout(()=>document.getElementById('narrText').style.display='none',300); };
+}
+
+/* =========== JOGO: fases e lógica =========== */
+
+const stage = document.getElementById('stageArea');
+const heartsEl = document.getElementById('hearts');
+const progressBar = document.getElementById('progressBar');
+const levelLabel = document.getElementById('levelLabel');
+const startBtn = document.getElementById('startBtn');
+const soundBtn = document.getElementById('soundBtn');
+const helpBtn = document.getElementById('helpBtn');
+const prevBtn = document.getElementById('prevBtn');
+const nextBtn = document.getElementById('nextBtn');
+
+let currentLevel = 0;
+let currentStep = 0;
+let lives = 3;
+let score = 0;
+
+/* level definitions: each level has a render() function and onComplete call */
+const levelsGame = [
+  {
+    id:'noe',
+    title:'Arca de Noé',
+    verses: 'Gênesis 9:13 (TNM)',
+    render: renderNoah,
+    onComplete(){}
+  },
+  {
+    id:'davi',
+    title:'Davi e Golias',
+    verses: '1 Samuel 17:37 (TNM)',
+    render: renderDavi,
+    onComplete(){}
+  },
+  {
+    id:'jonas',
+    title:'Jonas e o grande peixe',
+    verses: 'Jonas 2:1 (TNM)',
+    render: renderJonah,
+    onComplete(){}
+  },
+  {
+    id:'jesus',
+    title:'Jesus e as crianças',
+    verses: 'Marcos 10:14 (TNM)',
+    render: renderJesus,
+    onComplete(){}
+  }
+];
+
+function updateUI(){
+  heartsEl.textContent = '❤️'.repeat(lives) + '🤍'.repeat(3-lives);
+  levelLabel.textContent = `Fase ${currentLevel+1} • ${levelsGame[currentLevel].title}`;
+  const pct = ((currentStep)/(1))*100;
+  // We'll animate progress per stage differently; for simplicity set small progress
+  progressBar.style.width = `${(currentLevel/levelsGame.length)*100}%`;
+}
+
+/* start */
+startBtn.addEventListener('click', ()=>{
+  // start audio context on first user interaction
+  ensureAudio(); startMusic();
+  currentLevel = 0; currentStep = 0; lives=3; score=0;
+  updateUI();
+  gotoLevel(currentLevel);
+  speak("Vamos começar! Primeiro história: a Arca de Noé.");
+});
+
+soundBtn.addEventListener('click', ()=>{
+  musicOn = !musicOn;
+  if(musicOn) startMusic(); else stopMusic();
+  soundBtn.textContent = `🔊 Som: ${musicOn? 'On':'Off'}`;
+});
+
+helpBtn.addEventListener('click', ()=> {
+  speak("No primeiro jogo arraste os animais para dentro da arca. No segundo escolha quem é o herói Davi. No terceiro ligue a sequência. No quarto clique nas crianças. Boa sorte!");
+});
+
+prevBtn.addEventListener('click', ()=>{
+  if(currentLevel>0){ currentLevel--; gotoLevel(currentLevel); }
+});
+nextBtn.addEventListener('click', ()=>{
+  if(currentLevel<levelsGame.length-1){ currentLevel++; gotoLevel(currentLevel); }
+});
+
+/* goto level */
+function gotoLevel(idx){
+  currentLevel = idx;
+  lives = 3; updateUI(); clearStage(); levelsGame[idx].render();
+}
+
+/* helper to clear stage */
+function clearStage(){ stage.innerHTML = ''; }
+
+/* confetti */
+function burst(){
+  for(let i=0;i<30;i++){
+    const c = document.createElement('div'); c.className='confetti';
+    c.style.left = (20 + Math.random()*60) + '%';
+    c.style.top = (-10 + Math.random()*10) + 'vh';
+    c.style.background = `hsl(${Math.random()*360},80%,60%)`;
+    c.style.transform = `rotate(${Math.random()*360}deg)`;
+    document.body.appendChild(c);
+    const fall = 2000 + Math.random()*1200;
+    c.animate([{transform:'translateY(0) rotate(0)'},{transform:`translateY(${600 + Math.random()*200}px) rotate(${Math.random()*720}deg)`}],{duration:fall,iterations:1});
+    setTimeout(()=>c.remove(),fall+50);
+  }
+}
+
+/* =========== LEVEL 1 - Noah: drag animals into ark =========== */
+function renderNoah(){
+  updateUI();
+  const container = document.createElement('div');
+  container.className = 'scene';
+  const left = document.createElement('div'); left.className='left';
+  const right = document.createElement('div'); right.className='right';
+  // left: ark area
+  const arkCard = document.createElement('div'); arkCard.className='card ark-area';
+  arkCard.innerHTML = `<div style="font-weight:800">Arraste os animais para dentro da arca</div>
+    ${svg_ark()}`;
+  const dropHint = document.createElement('div'); dropHint.className='drop-here'; dropHint.textContent='Coloque aqui';
+  arkCard.appendChild(dropHint);
+  left.appendChild(arkCard);
+  // right: pile of animals
+  const pileCard = document.createElement('div'); pileCard.className='card';
+  pileCard.innerHTML = `<div style="font-weight:800">Animais</div><div class="animal-pile" id="animalPile"></div>`;
+  right.appendChild(pileCard);
+  container.appendChild(left); container.appendChild(right);
+  stage.appendChild(container);
+
+  // animals: we will create pairs (giraffe, elephant, lion, zebra)
+  const animals = [
+    {type:'giraffe',svg:svg_giraffe()},
+    {type:'elephant',svg:svg_elephant()},
+    {type:'lion',svg:svg_lion()},
+    {type:'zebra',svg:svg_zebra()}
+  ];
+  // create two of each and shuffle
+  let pile = [];
+  animals.forEach(a=>{ pile.push({...a}); pile.push({...a}); });
+  pile.sort(()=>Math.random()-0.5);
+
+  const pileEl = document.getElementById('animalPile');
+  pile.forEach((a,idx)=>{
+    const el = document.createElement('div'); el.className='animal'; el.draggable=true;
+    el.dataset.type = a.type;
+    el.innerHTML = a.svg;
+    pileEl.appendChild(el);
+
+    // drag handlers
+    el.addEventListener('dragstart', (ev)=>{ ev.dataTransfer.setData('text/plain', a.type); el.classList.add('dragging'); });
+    el.addEventListener('dragend', ()=> el.classList.remove('dragging'));
+
+    // touch support (clone)
+    el.addEventListener('pointerdown', pointerDragStart);
+  });
+
+  // ark drop zone
+  arkCard.addEventListener('dragover', (e)=>{ e.preventDefault(); arkCard.style.boxShadow='0 0 0 6px rgba(0,0,0,0.06)'; });
+  arkCard.addEventListener('dragleave', ()=>{ arkCard.style.boxShadow=''; });
+  arkCard.addEventListener('drop', (e)=>{ e.preventDefault(); arkCard.style.boxShadow=''; const t = e.dataTransfer.getData('text/plain'); handleDropAnimal(t); });
+
+  // touch pointer drag
+  let activeDrag = null;
+  function pointerDragStart(e){
+    // on touch, clone element
+    if(e.pointerType === 'touch' || e.pointerType === 'pen'){
+      const src = e.currentTarget;
+      activeDrag = src.cloneNode(true);
+      activeDrag.style.position='fixed';
+      activeDrag.style.left = (e.clientX - 40) + 'px';
+      activeDrag.style.top = (e.clientY - 40) + 'px';
+      activeDrag.classList.add('dragging');
+      document.body.appendChild(activeDrag);
+      function move(e2){
+        activeDrag.style.left = (e2.clientX - 40) + 'px';
+        activeDrag.style.top = (e2.clientY - 40) + 'px';
+      }
+      function up(e2){
+        document.removeEventListener('pointermove', move);
+        document.removeEventListener('pointerup', up);
+        // detect drop if near ark area center
+        const arkRect = arkCard.getBoundingClientRect();
+        if(e2.clientX >= arkRect.left && e2.clientX <= arkRect.right && e2.clientY >= arkRect.top && e2.clientY <= arkRect.bottom){
+          handleDropAnimal(src.dataset.type);
+          src.remove(); // remove original
+        }
+        activeDrag.remove();
+        activeDrag = null;
+      }
+      document.addEventListener('pointermove', move);
+      document.addEventListener('pointerup', up);
+    }
+  }
+
+  let collected = {};
+  function handleDropAnimal(type){
+    collected[type] = (collected[type]||0)+1;
+    // remove first matching element from pile visually
+    const el = Array.from(pileEl.children).find(c=>c.dataset.type===type);
+    if(el) el.remove();
+    // small sound and animation
+    tone(880,0.06); playPling();
+    // check completion: all pairs must be collected (2 each)
+    const done = animals.every(a => (collected[a.type]||0) >= 2);
+    if(done){
+      // success
+      speak("Muito bem! Você ajudou Noé a colocar os animais na arca! Jeová prometeu nunca mais destruir a terra com um dilúvio. Gênesis 9:13.");
+      burst();
+      setTimeout(()=> levelComplete(), 1200);
+    }
+  }
+
+  // small pling using tones
+  function playPling(){ tone(1200,0.08); tone(900,0.09); }
+}
+
+/* =========== LEVEL 2 - Davi e Golias: image choice =========== */
+function renderDavi(){
+  updateUI();
+  const wrap = document.createElement('div'); wrap.className='center';
+  const card = document.createElement('div'); card.className='card';
+  card.innerHTML = `<div style="font-weight:800">Quem é Davi?</div><p style="margin:6px 0">Toque na figura que mostra Davi (o jovem pastor/herói).</p>`;
+  wrap.appendChild(card);
+
+  const opts = document.createElement('div'); opts.className='opts-grid';
+  const choices = [
+    {id:'davi',svg:svg_davi(), isAnswer:true},
+    {id:'goliath',svg:svg_goliath(), isAnswer:false},
+    {id:'shepherd',svg:svg_davi(), isAnswer:false}, // duplicate playful
+    {id:'soldier',svg:svg_goliath(), isAnswer:false}
+  ].sort(()=>Math.random()-0.5);
+
+  choices.forEach(c=>{
+    const b = document.createElement('div'); b.className='choice';
+    b.innerHTML = c.svg + `<div style="font-size:.85rem;margin-top:6px">${c.id==='davi'?'Davi':'Personagem'}</div>`;
+    b.addEventListener('click', ()=>{
+      if(c.isAnswer){
+        b.classList.add('correct'); tone(880,0.08); speak("Acertou! Davi confiou em Jeová e venceu o gigante. 1 Samuel 17:37.");
+        burst(); setTimeout(()=> levelComplete(),1000);
+      } else {
+        b.classList.add('wrong'); tone(220,0.12); lives = Math.max(0, lives-1); updateUI();
+        speak("Não é esse. Tente de novo.");
+      }
+    });
+    opts.appendChild(b);
+  });
+
+  wrap.appendChild(opts);
+  stage.appendChild(wrap);
+}
+
+/* =========== LEVEL 3 - Jonas: ligar sequência (click sequence) =========== */
+function renderJonah(){
+  updateUI();
+  const wrap = document.createElement('div'); wrap.className='center';
+  const card = document.createElement('div'); card.className='card';
+  card.innerHTML = `<div style="font-weight:800">Ligue a sequência: Jonas</div><p style="margin:6px 0">Toque na ordem correta: Jonas → Barco → Peixe → Nínive</p>`;
+  wrap.appendChild(card);
+
+  const board = document.createElement('div'); board.className='connect-board card';
+  board.style.padding = '14px';
+  const row = document.createElement('div'); row.className='connect-row';
+
+  const items = [
+    {key:'jonas',label:'Jonas',svg:svg_jonah()},
+    {key:'boat',label:'Barco',svg:svg_boat()},
+    {key:'fish',label:'Peixe',svg:svg_fish()},
+    {key:'nini',label:'Nínive',svg:svg_map()}
+  ];
+  // randomize positions horizontally to be more game-like
+  const shuffled = items.sort(()=>Math.random()-0.5);
+  let expectedIndex = 0;
+  shuffled.forEach(it=>{
+    const box = document.createElement('div'); box.className='connect-item'; box.innerHTML = it.svg + `<div style="font-size:.85rem">${it.label}</div>`;
+    box.dataset.key = it.key;
+    box.addEventListener('click', ()=>{
+      // check if correct next
+      if(it.key === items[expectedIndex].key){
+        box.style.outline = `4px solid ${getComputedStyle(document.documentElement).getPropertyValue('--accent')||'#ffb703'}`;
+        tone(900,0.08); expectedIndex++;
+        if(expectedIndex >= items.length){
+          speak("Muito bem! Você completou a sequência. Jonas orou a Jeová da barriga do peixe. Jonas 2:1.");
+          burst(); setTimeout(()=> levelComplete(),1000);
+        }
+      } else {
+        box.style.outline = `4px solid ${'#ef4444'}`;
+        tone(220,0.12); lives = Math.max(0,lives-1); updateUI();
+        speak("Essa não é a próxima. Tente novamente.");
+      }
+    });
+    row.appendChild(box);
+  });
+
+  board.appendChild(row);
+  wrap.appendChild(board);
+  stage.appendChild(wrap);
+}
+
+/* =========== LEVEL 4 - Jesus and children: click kids =========== */
+function renderJesus(){
+  updateUI();
+  const wrap = document.createElement('div'); wrap.className='center';
+  const card = document.createElement('div'); card.className='card';
+  card.innerHTML = `<div style="font-weight:800">Jesus e as crianças</div><p style="margin:6px 0">Toque em todas as crianças ao redor de Jesus.</p>`;
+  wrap.appendChild(card);
+
+  const board = document.createElement('div'); board.className='scene';
+  const left = document.createElement('div'); left.className='left card';
+  const right = document.createElement('div'); right.className='right card';
+  // left: Jesus big
+  left.innerHTML = `<div style="font-weight:700">Jesus</div>`; left.insertAdjacentHTML('beforeend', svg_jesus());
+  // right: grid of children (6)
+  right.innerHTML = `<div style="font-weight:700">Crianças</div><div style="display:flex;flex-wrap:wrap;gap:10px;justify-content:center;margin-top:8px" id="kidsGrid"></div>`;
+  board.appendChild(left); board.appendChild(right);
+  wrap.appendChild(board);
+  stage.appendChild(wrap);
+
+  const grid = document.getElementById('kidsGrid');
+  const colors = ['#ffd7b5','#ffccf2','#d0f7e7','#fff1b8','#cfe8ff','#ffd2b3'];
+  let remaining = 6;
+  for(let i=0;i<6;i++){
+    const col = colors[i%colors.length];
+    const d = document.createElement('div'); d.className='choice'; d.style.width='90px'; d.style.height='90px';
+    d.innerHTML = svg_child(col);
+    d.addEventListener('click', ()=>{
+      if(d.dataset.clicked) return;
+      d.dataset.clicked = '1'; d.style.opacity = '0.6';
+      tone(1000,0.07); remaining--;
+      if(remaining<=0){
+        speak("Que bom! Jesus acolheu as crianças. Deixem as criancinhas vir a mim. Marcos 10:14.");
+        burst(); setTimeout(()=> levelComplete(),900);
+      }
+    });
+    grid.appendChild(d);
+  }
+}
+
+/* =========== LEVEL COMPLETE / game flow =========== */
+function levelComplete(){
+  // show summary: for small children keep it simple: show verse text and praise
+  clearStage();
+  const area = document.createElement('div'); area.className='center';
+  area.innerHTML = `<div class="card" style="padding:18px">
+    <h2>Parabéns!</h2>
+    <p style="font-weight:700">${levelsGame[currentLevel].title} concluída</p>
+    <p style="margin-top:8px">Versículo:</p>
+    <p style="font-size:1rem;font-weight:600">${levelsGame[currentLevel].verses} (TNM)</p>
+    <p style="margin-top:10px">Você fez um ótimo trabalho!</p>
+  </div>`;
+  stage.appendChild(area);
+  // advance or finish
+  if(currentLevel < levelsGame.length -1){
+    const btn = document.createElement('button'); btn.className='big-btn'; btn.textContent='Próxima História';
+    btn.addEventListener('click', ()=>{
+      currentLevel++; gotoLevel(currentLevel);
+      speak("Vamos para a próxima história!");
+    });
+    area.appendChild(btn);
+  } else {
+    const btn = document.createElement('button'); btn.className='big-btn'; btn.textContent='Voltar ao Início';
+    btn.addEventListener('click', ()=>{
+      speak("Você terminou todas as histórias. Voltar ao início.");
+      clearStage(); goHomeScreen();
+    });
+    area.appendChild(btn);
+  }
+  burst();
+}
+
+/* show home screen content */
+function goHomeScreen(){
+  clearStage();
+  const c = document.createElement('div'); c.className='center';
+  c.innerHTML = `<div style="max-width:620px;text-align:center">
+    <p style="font-size:1.05rem">Bem-vindo(a) de novo! Toque em Iniciar para jogar.</p>
+    <p style="color:#045">Cada fase foi feita para crianças pequenas — você pode acompanhar a narração e repetir quantas vezes quiser.</p>
+  </div>`;
+  stage.appendChild(c);
+}
+
+/* helper: gotoLevel wrapper for progression */
+function gotoLevel(i){
+  currentLevel = i; lives = 3; playToneOnStart();
+  updateUI();
+  clearStage();
+  // small intro narration per level
+  const title = levelsGame[currentLevel].title;
+  const intro = {
+    0: "Agora: a história da Arca de Noé. Arraste os animais para a arca.",
+    1: "Agora: Davi e Golias. Escolha a figura de Davi.",
+    2: "Agora: Jonas e o grande peixe. Ligue a sequência correta.",
+    3: "Agora: Jesus e as crianças. Toque em todas as crianças ao redor de Jesus."
+  }[currentLevel] || `Agora: ${title}`;
+  speak(intro);
+  levelsGame[currentLevel].render();
+}
+
+/* small sound on level start */
+function playToneOnStart(){ tone(660,0.07); tone(880,0.07); }
+
+/* init home */
+goHomeScreen();
+updateUI();
+
+/* allow autoplay voice on some browsers by warming voices */
+if(window.speechSynthesis){
+  window.speechSynthesis.onvoiceschanged = ()=>{};
+}
+
+/* expose some functions for debugging if needed */
+window._descobrir = {gotoLevel, burst, speak};
+
+</script>
+</body>
+</html>
